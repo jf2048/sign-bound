@@ -1,0 +1,18 @@
+[package]
+name = "sign-bound"
+version = "1.0.0"
+edition = "2021"
+description = "Layout-optimized positive and negative integers"
+license = "MIT"
+documentation = "https://docs.rs/sign-bound"
+homepage = "https://github.com/jf2048/sign-bound"
+repository = "https://github.com/jf2048/sign-bound.git"
+readme = "README.md"
+keywords = ["integer", "positive", "negative", "bounded", "signed"]
+resolver = "2"
+
+[lib]
+path = "lib.rs"
+
+[dev-dependencies]
+proptest = "1.5.0"
