@@ -1,6 +1,7 @@
 [package]
 name = "sign-bound"
-version = "1.0.0"
+version = "2.0.0"
+rust-version = "1.81.0"
 edition = "2021"
 description = "Layout-optimized positive and negative integers"
 license = "MIT"

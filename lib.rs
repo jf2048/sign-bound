@@ -30,7 +30,7 @@
 #![no_std]
 
 macro_rules! impl_positive {
-    ($(#[$attr:meta])* $ty:ident, $base:ty, $uns:ty) => {
+    ($(#[$attr:meta])* $ty:ident, $sty:ident, $base:ty, $uns:ty) => {
         #[derive(Copy, Clone)]
         #[repr(C)]
         $(#[$attr])*
@@ -50,7 +50,7 @@ macro_rules! impl_positive {
                 if value < 0 {
                     return None;
                 }
-                unsafe { Some(Self::new_unchecked(value)) }
+                unsafe { Some(core::mem::transmute(value)) }
             }
             #[inline]
             pub const unsafe fn new_unchecked(value: $base) -> Self {
@@ -59,7 +59,11 @@ macro_rules! impl_positive {
             }
             #[inline]
             pub const fn get(self) -> $base {
-                unsafe { core::mem::transmute(self) }
+                unsafe {
+                    let n = core::mem::transmute(self);
+                    core::hint::assert_unchecked(n >= 0);
+                    n
+                }
             }
             #[inline]
             pub const fn count_zeros(self) -> u32 {
@@ -90,6 +94,10 @@ macro_rules! impl_positive {
                 self.get().ilog10()
             }
             #[inline]
+            pub const fn checked_neg(self) -> Option<$sty> {
+                $sty::new(-self.get())
+            }
+            #[inline]
             pub const fn checked_add(self, other: Self) -> Option<Self> {
                 match self.get().checked_add(other.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
@@ -97,9 +105,41 @@ macro_rules! impl_positive {
                 }
             }
             #[inline]
+            pub const fn checked_sub(self, other: Self) -> Option<Self> {
+                Self::new(self.get() - other.get())
+            }
+            #[inline]
             pub const fn checked_mul(self, other: Self) -> Option<Self> {
                 match self.get().checked_mul(other.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
+                    None => None,
+                }
+            }
+            #[inline]
+            pub const fn checked_div(self, other: Self) -> Option<Self> {
+                match self.get().checked_div(other.get()) {
+                    Some(n) => unsafe { Some(Self::new_unchecked(n)) },
+                    None => None,
+                }
+            }
+            #[inline]
+            pub const fn checked_rem(self, other: Self) -> Option<Self> {
+                match self.get().checked_rem(other.get()) {
+                    Some(n) => unsafe { Some(Self::new_unchecked(n)) },
+                    None => None,
+                }
+            }
+            #[inline]
+            pub const fn checked_div_unsigned(self, other: $uns) -> Option<Self> {
+                match (self.get() as $uns).checked_div(other) {
+                    Some(n) => unsafe { Some(Self::new_unchecked(n as $base)) },
+                    None => None,
+                }
+            }
+            #[inline]
+            pub const fn checked_rem_unsigned(self, other: $uns) -> Option<Self> {
+                match (self.get() as $uns).checked_rem(other) {
+                    Some(n) => unsafe { Some(Self::new_unchecked(n as $base)) },
                     None => None,
                 }
             }
@@ -112,10 +152,7 @@ macro_rules! impl_positive {
             }
             #[inline]
             pub const fn checked_next_power_of_two(self) -> Option<Self> {
-                match (self.get() as $uns).checked_next_power_of_two() {
-                    Some(n) => Self::new(n as $base),
-                    None => None,
-                }
+                Self::new((self.get() as $uns).next_power_of_two() as $base)
             }
             #[inline]
             pub const fn checked_ilog2(self) -> Option<u32> {
@@ -129,6 +166,13 @@ macro_rules! impl_positive {
             pub const fn saturating_add(self, other: Self) -> Self {
                 let n = self.get().saturating_add(other.get());
                 unsafe { Self::new_unchecked(n) }
+            }
+            #[inline]
+            pub const fn saturating_sub(self, other: Self) -> Self {
+                match Self::new(self.get() - other.get()) {
+                    Some(n) => n,
+                    None => Self::MIN
+                }
             }
             #[inline]
             pub const fn saturating_mul(self, other: Self) -> Self {
@@ -186,6 +230,54 @@ macro_rules! impl_positive {
             }
         }
 
+        impl core::ops::Div for $ty {
+            type Output = Self;
+            fn div(self, rhs: Self) -> Self::Output {
+                unsafe { Self::new_unchecked(self.get().div(rhs.get())) }
+            }
+        }
+        impl core::ops::DivAssign for $ty {
+            fn div_assign(&mut self, rhs: Self) {
+                *self = core::ops::Div::div(*self, rhs);
+            }
+        }
+
+        impl core::ops::Rem for $ty {
+            type Output = Self;
+            fn rem(self, rhs: Self) -> Self::Output {
+                unsafe { Self::new_unchecked(self.get().rem(rhs.get())) }
+            }
+        }
+        impl core::ops::RemAssign for $ty {
+            fn rem_assign(&mut self, rhs: Self) {
+                *self = core::ops::Rem::rem(*self, rhs);
+            }
+        }
+
+        impl core::ops::Div<$uns> for $ty {
+            type Output = Self;
+            fn div(self, rhs: $uns) -> Self::Output {
+                unsafe { Self::new_unchecked((self.get() as $uns).div(rhs) as $base) }
+            }
+        }
+        impl core::ops::DivAssign<$uns> for $ty {
+            fn div_assign(&mut self, rhs: $uns) {
+                *self = core::ops::Div::div(*self, rhs);
+            }
+        }
+
+        impl core::ops::Rem<$uns> for $ty {
+            type Output = Self;
+            fn rem(self, rhs: $uns) -> Self::Output {
+                unsafe { Self::new_unchecked((self.get() as $uns).rem(rhs) as $base) }
+            }
+        }
+        impl core::ops::RemAssign<$uns> for $ty {
+            fn rem_assign(&mut self, rhs: $uns) {
+                *self = core::ops::Rem::rem(*self, rhs);
+            }
+        }
+
         impl core::ops::BitAnd<$base> for $ty {
             type Output = Self;
             #[inline]
@@ -193,7 +285,6 @@ macro_rules! impl_positive {
                 unsafe { Self::new_unchecked(self.get().bitand(rhs)) }
             }
         }
-
         impl core::ops::BitAndAssign<$base> for $ty {
             #[inline]
             fn bitand_assign(&mut self, rhs: $base) {
@@ -208,6 +299,7 @@ macro_rules! impl_positive {
                 unsafe { $ty::new_unchecked(self.bitand(rhs.get())) }
             }
         }
+
         impl_bit_op! { BitOr::bitor, BitOrAssign::bitor_assign for $ty }
         impl_bit_op! { BitAnd::bitand, BitAndAssign::bitand_assign for $ty }
         impl_bit_op! { BitXor::bitxor, BitXorAssign::bitxor_assign for $ty }
@@ -216,7 +308,7 @@ macro_rules! impl_positive {
 }
 
 macro_rules! impl_negative {
-    ($(#[$attr:meta])* $ty:ident, $unty:ident, $base:ty, $uns:ty) => {
+    ($(#[$attr:meta])* $ty:ident, $pty:ident, $base:ty, $uns:ty) => {
         #[derive(Copy, Clone)]
         $(#[$attr])*
         #[repr(C)]
@@ -236,7 +328,7 @@ macro_rules! impl_negative {
                 if value >= 0 {
                     return None;
                 }
-                unsafe { Some(Self::new_unchecked(value)) }
+                unsafe { Some(core::mem::transmute(value)) }
             }
             #[inline]
             pub const unsafe fn new_unchecked(value: $base) -> Self {
@@ -245,7 +337,11 @@ macro_rules! impl_negative {
             }
             #[inline]
             pub const fn get(self) -> $base {
-                unsafe { core::mem::transmute(self) }
+                unsafe {
+                    let n = core::mem::transmute(self);
+                    core::hint::assert_unchecked(n < 0);
+                    n
+                }
             }
             #[inline]
             pub const fn count_zeros(self) -> u32 {
@@ -264,61 +360,92 @@ macro_rules! impl_negative {
                 self.get().trailing_zeros()
             }
             #[inline]
-            pub const fn abs(self) -> $unty {
-                let n = self.get().abs();
-                unsafe { $unty::new_unchecked(n) }
-            }
-            #[inline]
-            pub const fn unsigned_abs(self) -> $uns {
-                self.get().unsigned_abs()
-            }
-            #[inline]
-            pub const fn checked_abs(self) -> Option<$unty> {
+            pub const fn checked_abs(self) -> Option<$pty> {
                 match self.get().checked_abs() {
-                    Some(n) => unsafe { Some($unty::new_unchecked(n)) },
+                    Some(n) => unsafe { Some($pty::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_neg(self) -> Option<$unty> {
+            pub const fn checked_neg(self) -> Option<$pty> {
                 match self.get().checked_neg() {
-                    Some(n) => unsafe { Some($unty::new_unchecked(n)) },
+                    Some(n) => unsafe { Some($pty::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_sub(self, other: Self) -> Option<Self> {
+            pub const fn checked_add(self, other: Self) -> Option<Self> {
                 match self.get().checked_add(other.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_mul(self, other: $unty) -> Option<Self> {
+            pub const fn checked_sub(self, other: Self) -> Option<Self> {
+                Self::new(self.get() - other.get())
+            }
+            #[inline]
+            pub const fn checked_mul(self, other: Self) -> Option<$pty> {
                 match self.get().checked_mul(other.get()) {
-                    Some(n) => unsafe { Some(Self::new_unchecked(n)) },
+                    Some(n) => unsafe { Some($pty::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn saturating_abs(self) -> $unty {
-                let n = self.get().saturating_abs();
-                unsafe { $unty::new_unchecked(n) }
+            pub const fn checked_mul_positive(self, other: $pty) -> Option<Self> {
+                match self.get().checked_mul(other.get()) {
+                    Some(n) => Self::new(n),
+                    None => None,
+                }
             }
             #[inline]
-            pub const fn saturating_neg(self) -> $unty {
+            pub const fn checked_div(self, other: Self) -> Option<$pty> {
+                let n = self.get() / other.get();
+                unsafe { Some($pty::new_unchecked(n)) }
+            }
+            #[inline]
+            pub const fn checked_div_euclid(self, other: Self) -> Option<$pty> {
+                let n = self.get().div_euclid(other.get());
+                unsafe { Some($pty::new_unchecked(n)) }
+            }
+            #[inline]
+            pub const fn checked_rem_euclid(self, other: $base) -> Option<$pty> {
+                let n = self.get().rem_euclid(other);
+                unsafe { Some($pty::new_unchecked(n)) }
+            }
+            #[inline]
+            pub const fn saturating_abs(self) -> $pty {
+                let n = self.get().saturating_abs();
+                unsafe { $pty::new_unchecked(n) }
+            }
+            #[inline]
+            pub const fn saturating_neg(self) -> $pty {
                 let n = self.get().saturating_neg();
-                unsafe { $unty::new_unchecked(n) }
+                unsafe { $pty::new_unchecked(n) }
+            }
+            #[inline]
+            pub const fn saturating_add(self, other: Self) -> Self {
+                let n = self.get().saturating_add(other.get());
+                unsafe { Self::new_unchecked(n) }
             }
             #[inline]
             pub const fn saturating_sub(self, other: Self) -> Self {
-                let n = self.get().saturating_sub(other.get());
-                unsafe { Self::new_unchecked(n) }
+                match Self::new(self.get() - other.get()) {
+                    Some(n) => n,
+                    None => Self::MAX
+                }
             }
             #[inline]
-            pub const fn saturating_mul(self, other: $unty) -> Self {
+            pub const fn saturating_mul(self, other: Self) -> $pty {
                 let n = self.get().saturating_mul(other.get());
-                unsafe { Self::new_unchecked(n) }
+                unsafe { $pty::new_unchecked(n) }
+            }
+            #[inline]
+            pub const fn saturating_mul_positive(self, other: $pty) -> Self {
+                match Self::new(self.get().saturating_mul(other.get())) {
+                    Some(n) => n,
+                    None => Self::MAX,
+                }
             }
         }
 
@@ -366,7 +493,6 @@ macro_rules! impl_negative {
                 unsafe { Self::new_unchecked(self.get().bitor(rhs)) }
             }
         }
-
         impl core::ops::BitOrAssign<$base> for $ty {
             #[inline]
             fn bitor_assign(&mut self, rhs: $base) {
@@ -382,8 +508,92 @@ macro_rules! impl_negative {
             }
         }
 
+        impl core::ops::BitOr<$ty> for $pty {
+            type Output = $ty;
+            #[inline]
+            fn bitor(self, rhs: $ty) -> Self::Output {
+                unsafe { $ty::new_unchecked(self.get().bitor(rhs.get())) }
+            }
+        }
+        impl core::ops::BitOr<$pty> for $ty {
+            type Output = Self;
+            #[inline]
+            fn bitor(self, rhs: $pty) -> Self::Output {
+                unsafe { $ty::new_unchecked(self.get().bitor(rhs.get())) }
+            }
+        }
+        impl core::ops::BitOrAssign<$pty> for $ty {
+            #[inline]
+            fn bitor_assign(&mut self, rhs: $pty) {
+                *self = core::ops::BitOr::bitor(*self, rhs);
+            }
+        }
+
+        impl core::ops::BitAnd<$pty> for $ty {
+            type Output = $pty;
+            #[inline]
+            fn bitand(self, rhs: $pty) -> Self::Output {
+                unsafe { $pty::new_unchecked(self.get().bitand(rhs.get())) }
+            }
+        }
+        impl core::ops::BitAnd<$ty> for $pty {
+            type Output = Self;
+            #[inline]
+            fn bitand(self, rhs: $ty) -> Self::Output {
+                unsafe { Self::new_unchecked(self.get().bitand(rhs.get())) }
+            }
+        }
+        impl core::ops::BitAndAssign<$ty> for $pty {
+            #[inline]
+            fn bitand_assign(&mut self, rhs: $ty) {
+                *self = core::ops::BitAnd::bitand(*self, rhs);
+            }
+        }
+
+        impl core::ops::BitXor<$pty> for $ty {
+            type Output = Self;
+            #[inline]
+            fn bitxor(self, rhs: $pty) -> Self::Output {
+                unsafe { Self::new_unchecked(self.get().bitxor(rhs.get())) }
+            }
+        }
+        impl core::ops::BitXorAssign<$pty> for $ty {
+            #[inline]
+            fn bitxor_assign(&mut self, rhs: $pty) {
+                *self = core::ops::BitXor::bitxor(*self, rhs);
+            }
+        }
+        impl core::ops::BitXor<$ty> for $pty {
+            type Output = $ty;
+            #[inline]
+            fn bitxor(self, rhs: $ty) -> Self::Output {
+                unsafe { $ty::new_unchecked(self.get().bitxor(rhs.get())) }
+            }
+        }
+        impl core::ops::BitXor for $ty {
+            type Output = $pty;
+            #[inline]
+            fn bitxor(self, rhs: Self) -> Self::Output {
+                unsafe { $pty::new_unchecked(self.get().bitxor(rhs.get())) }
+            }
+        }
+
+        impl core::ops::Not for $ty {
+            type Output = $pty;
+            fn not(self) -> Self::Output {
+                unsafe { $pty::new_unchecked(self.get().not()) }
+            }
+        }
+        impl core::ops::Not for $pty {
+            type Output = $ty;
+            fn not(self) -> Self::Output {
+                unsafe { $ty::new_unchecked(self.get().not()) }
+            }
+        }
+
         impl_fmt! { Display, Debug, Binary, Octal, LowerHex, UpperHex => $ty }
         impl_bit_op! { BitOr::bitor, BitOrAssign::bitor_assign for $ty }
+        impl_bit_op! { BitAnd::bitand, BitAndAssign::bitand_assign for $ty }
     };
 }
 
@@ -410,6 +620,33 @@ macro_rules! impl_from {
             }
         }
         impl_from! { $($rest),* => $ty }
+    };
+}
+
+macro_rules! impl_primitive_from {
+    ($ty:ty =>) => {};
+    ($ty:ty => $from:ty $(, $rest:ty)*) => {
+        impl From<$ty> for $from {
+            #[inline]
+            fn from(value: $ty) -> Self {
+                value.get() as _
+            }
+        }
+        impl_primitive_from! { $ty => $($rest),* }
+    };
+}
+
+macro_rules! impl_primitive_try_from {
+    ($ty:ty =>) => {};
+    ($ty:ty => $from:ty $(, $rest:ty)*) => {
+        impl TryFrom<$ty> for $from {
+            type Error = core::num::TryFromIntError;
+            #[inline]
+            fn try_from(value: $ty) -> Result<Self, Self::Error> {
+                Self::try_from(value.get())
+            }
+        }
+        impl_primitive_try_from! { $ty => $($rest),* }
     };
 }
 
@@ -460,6 +697,80 @@ macro_rules! impl_bit_op {
         }
     };
 }
+
+impl_positive! { #[repr(align(1))] PositiveI8, NegativeI8, i8, u8 }
+impl_primitive_from! { PositiveI8 => u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize }
+impl_positive_try_from! { u8, u16, u32, u64, u128, usize => PositiveI8, i8 }
+impl_positive_try_from! { i16, i32, i64, i128, isize => PositiveI8, u8, i8 }
+impl_positive_try_from! { i8 => PositiveI8, u8 }
+impl_negative! { #[repr(align(1))] NegativeI8, PositiveI8, i8, u8 }
+impl_primitive_from! { NegativeI8 => i8, i16, i32, i64, i128, isize }
+impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI8, u8, i8 }
+
+impl_positive! { #[repr(align(2))] PositiveI16, NegativeI16, i16, u16 }
+impl_from! { u8 => PositiveI16 }
+impl_primitive_from! { PositiveI16 => u16, u32, u64, u128, usize, i16, i32, i64, i128, isize }
+impl_primitive_try_from! { PositiveI16 => u8, i8 }
+impl_positive_try_from! { u16, u32, u64, u128, usize => PositiveI16, i16 }
+impl_positive_try_from! { i8, i32, i64, i128, isize => PositiveI16, u16, i16 }
+impl_positive_try_from! { i16 => PositiveI16, u16 }
+impl_negative! { #[repr(align(2))] NegativeI16, PositiveI16, i16, u16 }
+impl_primitive_from! { NegativeI16 => i16, i32, i64, i128, isize }
+impl_primitive_try_from! { NegativeI16 => i8 }
+impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI16, u16, i16 }
+
+impl_positive! { #[repr(align(4))] PositiveI32, NegativeI32, i32, u32 }
+impl_from! { u8, u16 => PositiveI32 }
+impl_primitive_from! { PositiveI32 => u32, u64, u128, i32, i64, i128 }
+impl_primitive_try_from! { PositiveI32 => u8, u16, usize, i8, i16, isize }
+impl_positive_try_from! { u32, u64, u128, usize => PositiveI32, i32 }
+impl_positive_try_from! { i8, i16, i64, i128, isize => PositiveI32, u32, i32 }
+impl_positive_try_from! { i32 => PositiveI32, u32 }
+impl_negative! { #[repr(align(4))] NegativeI32, PositiveI32, i32, u32 }
+impl_primitive_from! { NegativeI32 => i32, i64, i128 }
+impl_primitive_try_from! { NegativeI32 => i8, i16, isize }
+impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI32, u32, i32 }
+
+impl_positive! { #[repr(align(8))] PositiveI64, NegativeI64, i64, u64 }
+impl_from! { u8, u16, u32 => PositiveI64 }
+impl_primitive_from! { PositiveI64 => u64, u128, i64, i128 }
+impl_primitive_try_from! { PositiveI64 => u8, u16, u32, usize, i8, i16, i32, isize }
+impl_positive_try_from! { u64, u128, usize => PositiveI64, i64 }
+impl_positive_try_from! { i8, i16, i32, i128, isize => PositiveI64, u64, i64 }
+impl_positive_try_from! { i64 => PositiveI64, u64 }
+impl_negative! { #[repr(align(8))] NegativeI64, PositiveI64, i64, u64 }
+impl_primitive_from! { NegativeI64 => i64, i128 }
+impl_primitive_try_from! { NegativeI64 => i8, i16, i32, isize }
+impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI64, u64, i64 }
+
+#[cfg(not(any(
+    target_pointer_width = "16",
+    target_pointer_width = "32",
+    target_pointer_width = "64",
+)))]
+compile_error!("unsupported pointer width");
+
+impl_positive! {
+    #[cfg_attr(target_pointer_width = "16", repr(align(2)))]
+    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+    PositiveIsize, NegativeIsize, isize, usize
+}
+impl_from! { u8 => PositiveIsize }
+impl_primitive_from! { PositiveIsize => usize, isize }
+impl_primitive_try_from! { PositiveIsize => u8, u16, u32, u64, u128, i8, i16, i32, i64, i128 }
+impl_positive_try_from! { u16, u32, u64, u128, usize => PositiveIsize, isize }
+impl_positive_try_from! { i8, i16, i32, i64, i128 => PositiveIsize, usize, isize }
+impl_positive_try_from! { isize => PositiveIsize, usize }
+impl_negative! {
+    #[cfg_attr(target_pointer_width = "16", repr(align(2)))]
+    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+    NegativeIsize, PositiveIsize, isize, usize
+}
+impl_primitive_from! { NegativeIsize => isize }
+impl_primitive_try_from! { NegativeIsize => i8, i16, i32, i64, i128 }
+impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeIsize, usize, isize }
 
 #[derive(Copy, Clone)]
 #[repr(u8)]
@@ -727,88 +1038,281 @@ enum NegativeHighByte {
     _255 = 255,
 }
 
-impl_positive! { #[repr(align(1))] PositiveI8, i8, u8 }
-impl_positive_try_from! { u8, u16, u32, u64, u128, usize => PositiveI8, i8 }
-impl_positive_try_from! { i16, i32, i64, i128, isize => PositiveI8, u8, i8 }
-impl_positive_try_from! { i8 => PositiveI8, u8 }
-impl_negative! { #[repr(align(1))] NegativeI8, PositiveI8, i8, u8 }
-impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI8, u8, i8 }
-
-impl_positive! { #[repr(align(2))] PositiveI16, i16, u16 }
-impl_from! { u8 => PositiveI16 }
-impl_positive_try_from! { u16, u32, u64, u128, usize => PositiveI16, i16 }
-impl_positive_try_from! { i8, i32, i64, i128, isize => PositiveI16, u16, i16 }
-impl_positive_try_from! { i16 => PositiveI16, u16 }
-impl_negative! { #[repr(align(2))] NegativeI16, PositiveI16, i16, u16 }
-impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI16, u16, i16 }
-
-impl_positive! { #[repr(align(4))] PositiveI32, i32, u32 }
-impl_from! { u8, u16 => PositiveI32 }
-impl_positive_try_from! { u32, u64, u128, usize => PositiveI32, i32 }
-impl_positive_try_from! { i8, i16, i64, i128, isize => PositiveI32, u32, i32 }
-impl_positive_try_from! { i32 => PositiveI32, u32 }
-impl_negative! { #[repr(align(4))] NegativeI32, PositiveI32, i32, u32 }
-impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI32, u32, i32 }
-
-impl_positive! { #[repr(align(8))] PositiveI64, i64, u64 }
-impl_from! { u8, u16, u32 => PositiveI64 }
-impl_positive_try_from! { u64, u128, usize => PositiveI64, i64 }
-impl_positive_try_from! { i8, i16, i32, i128, isize => PositiveI64, u64, i64 }
-impl_positive_try_from! { i64 => PositiveI64, u64 }
-impl_negative! { #[repr(align(8))] NegativeI64, PositiveI64, i64, u64 }
-impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI64, u64, i64 }
-
-impl_positive! {
-    #[cfg_attr(target_pointer_width = "16", repr(align(2)))]
-    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
-    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
-    PositiveIsize, isize, usize
-}
-impl_from! { u8, u16 => PositiveIsize }
-impl_positive_try_from! { u32, u64, u128, usize => PositiveIsize, isize }
-impl_positive_try_from! { i8, i16, i32, i64, i128 => PositiveIsize, usize, isize }
-impl_positive_try_from! { isize => PositiveIsize, usize }
-impl_negative! {
-    #[cfg_attr(target_pointer_width = "16", repr(align(2)))]
-    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
-    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
-    NegativeIsize, PositiveIsize, isize, usize
-}
-impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeIsize, usize, isize }
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::ops::{
+        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Not, Rem,
+        RemAssign,
+    };
     use proptest::prelude::*;
 
+    macro_rules! test_unary {
+        ($ty:ident, $base:ident ($range:expr) :: $($method:ident),+ $(,)?) => {
+            proptest! {
+                $(#[test] fn $method(n in $range) {
+                    assert_eq!($ty::new(n).map(|n| n.$method()), Some((n as $base).$method()));
+                })+
+            }
+        };
+    }
+
+    macro_rules! test_unary_op {
+        ($ty:ident, $base:ident ($range:expr) :: $($method:ident),+ $(,)?) => {
+            proptest! {
+                $(#[test] fn $method(n in $range) {
+                    assert_eq!($ty::new(n).map(|n| n.$method().get()), Some((n as $base).$method()));
+                })+
+            }
+        };
+    }
+
+    macro_rules! test_unary_checked {
+        ($ty:ident, $base:ident ($range:expr) :: $($method:ident),+ $(,)?) => {
+            proptest! {
+                $(#[test] fn $method(n in $range) {
+                    assert_eq!($ty::new(n).and_then(|n| n.$method()), (n as $base).$method());
+                })+
+            }
+        };
+    }
+
+    macro_rules! test_binary {
+        ($ty:ident, $base:ident ($range1:expr, $range2:expr) :: $($method:ident),+ $(,)?) => {
+            proptest! {
+                $(#[test] fn $method(a in $range1, b in $range2) {
+                    assert_eq!(
+                        $ty::new(a).zip($ty::new(b)).map(|(a, b)| a.$method(b)).map(|a| a.get()),
+                        Some((a as $base).$method(b as $base)),
+                    );
+                })+
+            }
+        };
+    }
+
+    macro_rules! test_binary_checked {
+        ($ty:ident, $base:ident ($range1:expr, $range2:expr) :: $($method:ident),+ $(,)?) => {
+            proptest! {
+                $(#[test] fn $method(a in $range1, b in $range2) {
+                    assert_eq!(
+                        $ty::new(a).zip($ty::new(b)).and_then(|(a, b)| a.$method(b)).map(|a| a.get()),
+                        (a as $base).$method(b as $base),
+                    );
+                })+
+            }
+        };
+    }
+
+    macro_rules! test_assign {
+        ($ty:ident, $base:ident ($range1:expr, $range2:expr) :: $($method:ident),+ $(,)?) => {
+            proptest! {
+                $(#[test] fn $method(a in $range1, b in $range2) {
+                    let mut a1 = $ty::new(a);
+                    let mut a2 = a;
+                    if let Some((a, b)) = a1.as_mut().zip($ty::new(b)) {
+                        a.$method(b);
+                    }
+                    a2.$method(b);
+                    assert_eq!(a1.map(|a| a.get()), Some(a2));
+                })+
+            }
+        };
+    }
+
     macro_rules! test_type {
-        ($base:ident, $pos:ident, $neg:ident) => {
+        ($base:ident, $uns:ident, $pos:ident, $neg:ident) => {
             mod $base {
                 use super::*;
-                proptest! {
-                    #[test]
-                    fn positive_valid(n in 0..$base::MAX) {
-                        assert_eq!($pos::new(n).map(|n| n.get()), Some(n));
+                mod positive {
+                    use super::*;
+                    proptest! {
+                        #[test]
+                        fn valid(n in 0..=$base::MAX) {
+                            assert_eq!($pos::new(n).map(|n| n.get()), Some(n));
+                        }
+                        #[test]
+                        fn invalid(n in $base::MIN..-1) {
+                            assert_eq!($pos::new(n).map(|n| n.get()), None);
+                        }
+                        #[test]
+                        fn checked_neg(n in 0..=$base::MAX) {
+                            assert_eq!(
+                                $pos::new(n).and_then(|n| n.checked_neg()),
+                                n.checked_neg().and_then($neg::new),
+                            );
+                        }
+                        #[test]
+                        fn checked_sub(a in 0..=$base::MAX, b in 0..=$base::MAX) {
+                            assert_eq!(
+                                $pos::new(a).zip($pos::new(b)).and_then(|(a, b)| a.checked_sub(b)),
+                                a.checked_sub(b).and_then($pos::new),
+                            );
+                        }
+                        #[test]
+                        fn checked_div_unsigned(a in 0..=$base::MAX, b in 0..=$uns::MAX) {
+                            assert_eq!(
+                                $pos::new(a).and_then(|a| a.checked_div_unsigned(b)),
+                                (a as $uns).checked_div(b).and_then(|n| $pos::try_from(n).ok()),
+                            );
+                        }
+                        #[test]
+                        fn checked_rem_unsigned(a in 0..=$base::MAX, b in 0..=$uns::MAX) {
+                            assert_eq!(
+                                $pos::new(a).and_then(|a| a.checked_rem_unsigned(b)),
+                                (a as $uns).checked_rem(b).and_then(|n| $pos::try_from(n).ok()),
+                            );
+                        }
+                        #[test]
+                        fn checked_pow(a in 0..=$base::MAX, b in 0..u32::MAX) {
+                            assert_eq!(
+                                $pos::new(a).and_then(|a| a.checked_pow(b)).map(|n| n.get()),
+                                a.checked_pow(b),
+                            );
+                        }
+                        #[test]
+                        fn checked_next_power_of_two(n in 0..=$base::MAX) {
+                            assert_eq!(
+                                $pos::new(n).and_then(|n| n.checked_next_power_of_two()),
+                                (n as $uns).checked_next_power_of_two().and_then(|n| $pos::try_from(n).ok()),
+                            );
+                        }
+                        #[test]
+                        fn saturating_sub(a in 0..=$base::MAX, b in 0..=$base::MAX) {
+                            assert_eq!(
+                                $pos::new(a).zip($pos::new(b)).map(|(a, b)| a.saturating_sub(b)).map(|a| a.get()),
+                                Some(a.saturating_sub(b).max(0)),
+                            );
+                        }
+                        #[test]
+                        fn saturating_pow(a in 0..=$base::MAX, b in 0..u32::MAX) {
+                            assert_eq!(
+                                $pos::new(a).map(|a| a.saturating_pow(b)).map(|a| a.get()),
+                                Some((a as $base).saturating_pow(b)),
+                            );
+                        }
                     }
-                    #[test]
-                    fn positive_invalid(n in $base::MIN..-1) {
-                        assert_eq!($pos::new(n).map(|n| n.get()), None);
+                    test_unary_op! { $pos, $base (0..=$base::MAX) :: not }
+                    test_binary! { $pos, $base (0..=$base::MAX, 1..=$base::MAX) :: div, rem }
+                    test_unary! { $pos, $base (0..=$base::MAX)
+                    :: count_zeros, count_ones, leading_zeros, trailing_zeros }
+                    test_unary! { $pos, $uns (0..=$base::MAX) :: is_power_of_two }
+                    test_unary! { $pos, $base (1..=$base::MAX) :: ilog2, ilog10 }
+                    test_unary_checked! { $pos, $base (1..=$base::MAX) :: checked_ilog2, checked_ilog10 }
+                    test_binary_checked! { $pos, $base (0..=$base::MAX, 0..=$base::MAX)
+                    :: checked_add, checked_mul, checked_div, checked_rem }
+                    test_binary! { $pos, $base (0..=$base::MAX, 0..=$base::MAX)
+                    :: saturating_add, saturating_mul, bitor, bitand, bitxor }
+                    test_assign! { $pos, $base (0..=$base::MAX, 1..=$base::MAX) :: div_assign, rem_assign }
+                    test_assign! { $pos, $base (0..=$base::MAX, 0..=$base::MAX)
+                    :: bitor_assign, bitand_assign, bitxor_assign }
+                }
+                mod negative {
+                    use super::*;
+                    proptest! {
+                        #[test]
+                        fn valid(n in $base::MIN..0) {
+                            assert_eq!($neg::new(n).map(|n| n.get()), Some(n));
+                        }
+                        #[test]
+                        fn invalid(n in 0..=$base::MAX) {
+                            assert_eq!($neg::new(n).map(|n| n.get()), None);
+                        }
+                        #[test]
+                        fn checked_abs(n in $base::MIN..0) {
+                            assert_eq!(
+                                $neg::new(n).and_then(|n| n.checked_abs()).map(|n| n.get()),
+                                n.checked_abs(),
+                            );
+                        }
+                        #[test]
+                        fn checked_neg(n in $base::MIN..0) {
+                            assert_eq!(
+                                $neg::new(n).and_then(|n| n.checked_neg()).map(|n| n.get()),
+                                n.checked_neg(),
+                            );
+                        }
+                        #[test]
+                        fn checked_sub(a in $base::MIN..0, b in $base::MIN..0) {
+                            assert_eq!(
+                                $neg::new(a).zip($neg::new(b)).and_then(|(a, b)| a.checked_sub(b)),
+                                a.checked_sub(b).and_then($neg::new),
+                            );
+                        }
+                        #[test]
+                        fn checked_mul_positive(a in $base::MIN..0, b in 0..=$base::MAX) {
+                            assert_eq!(
+                                $neg::new(a)
+                                    .zip($pos::new(b))
+                                    .and_then(|(a, b)| a.checked_mul_positive(b)),
+                                a.checked_mul(b).and_then($neg::new),
+                            );
+                        }
+                        #[test]
+                        fn checked_rem_euclid(a in $base::MIN..0, b in $base::MIN..=$base::MAX) {
+                            assert_eq!(
+                                $neg::new(a).and_then(|a| a.checked_rem_euclid(b)).map(|n| n.get()),
+                                a.checked_rem_euclid(b),
+                            );
+                        }
+                        #[test]
+                        fn saturating_abs(n in $base::MIN..0) {
+                            assert_eq!(
+                                $neg::new(n).map(|n| n.saturating_abs().get()),
+                                Some(n.saturating_abs()),
+                            );
+                        }
+                        #[test]
+                        fn saturating_neg(n in $base::MIN..0) {
+                            assert_eq!(
+                                $neg::new(n).map(|n| n.saturating_neg().get()),
+                                Some(n.saturating_neg()),
+                            );
+                        }
+                        #[test]
+                        fn saturating_sub(a in $base::MIN..0, b in $base::MIN..0) {
+                            assert_eq!(
+                                $neg::new(a)
+                                    .zip($neg::new(b))
+                                    .map(|(a, b)| a.saturating_sub(b).get()),
+                                Some(a.saturating_sub(b).min(-1)),
+                            );
+                        }
+                        #[test]
+                        fn saturating_mul_positive(a in $base::MIN..0, b in 0..=$base::MAX) {
+                            assert_eq!(
+                                $neg::new(a)
+                                    .zip($pos::new(b))
+                                    .map(|(a, b)| a.saturating_mul_positive(b).get()),
+                                Some(a.saturating_mul(b).min(-1)),
+                            );
+                        }
+                        #[test]
+                        fn bitxor_assign(a in $base::MIN..0, b in 0..=$base::MAX) {
+                            let mut a1 = $neg::new(a);
+                            let mut a2 = a;
+                            if let Some((a, b)) = a1.as_mut().zip($pos::new(b)) {
+                                a.bitxor_assign(b);
+                            }
+                            a2.bitxor_assign(b);
+                            assert_eq!(a1.map(|a| a.get()), Some(a2));
+                        }
                     }
-                    #[test]
-                    fn negative_valid(n in $base::MIN..-1) {
-                        assert_eq!($neg::new(n).map(|n| n.get()), Some(n));
-                    }
-                    #[test]
-                    fn negative_invalid(n in 0..$base::MAX) {
-                        assert_eq!($neg::new(n).map(|n| n.get()), None);
-                    }
+                    test_unary_op! { $neg, $base ($base::MIN..0) :: not }
+                    test_unary! { $neg, $base ($base::MIN..0)
+                    :: count_zeros, count_ones, leading_zeros, trailing_zeros }
+                    test_binary_checked! { $neg, $base ($base::MIN..0, $base::MIN..0)
+                    :: checked_add, checked_mul, checked_div, checked_div_euclid }
+                    test_binary! { $neg, $base ($base::MIN..0, $base::MIN..0)
+                    :: saturating_add, saturating_mul, bitor, bitand, bitxor }
+                    test_assign! { $neg, $base ($base::MIN..0, $base::MIN..0)
+                    :: bitor_assign, bitand_assign }
                 }
             }
         };
     }
-    test_type! { i8, PositiveI8, NegativeI8 }
-    test_type! { i16, PositiveI16, NegativeI16 }
-    test_type! { i32, PositiveI32, NegativeI32 }
-    test_type! { i64, PositiveI64, NegativeI64 }
-    test_type! { isize, PositiveIsize, NegativeIsize }
+    test_type! { i8, u8, PositiveI8, NegativeI8 }
+    test_type! { i16, u16, PositiveI16, NegativeI16 }
+    test_type! { i32, u32, PositiveI32, NegativeI32 }
+    test_type! { i64, u64, PositiveI64, NegativeI64 }
+    test_type! { isize, usize, PositiveIsize, NegativeIsize }
 }
