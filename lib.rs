@@ -27,10 +27,15 @@
 //!
 //! [`NonZero`]: (https://doc.rust-lang.org/std/num/struct.NonZero.html)
 
+#![deny(missing_docs)]
 #![no_std]
 
 macro_rules! impl_positive {
     ($(#[$attr:meta])* $ty:ident, $sty:ident, $base:ty, $uns:ty) => {
+        /// A signed value that is known to be positive.
+        ///
+        /// This enables some memory layout optimization.
+        #[doc = concat!("For example, `Option<", stringify!($ty), ">` is the same size as [`", stringify!($base), "`].")]
         #[derive(Copy, Clone)]
         #[repr(C)]
         $(#[$attr])*
@@ -43,20 +48,33 @@ macro_rules! impl_positive {
         }
 
         impl $ty {
+            /// The size of this positive integer type in bits.
+            ///
+            #[doc = concat!("This value is equal to [`", stringify!($base), "::BITS`].")]
             pub const BITS: u32 = <$base>::BITS;
+            /// The smallest value that can be represented by this positive integer type, 0.
             pub const MIN: Self = unsafe { $ty::new_unchecked(0) };
+            #[doc = concat!("The largest value that can be represented by this positive integer type, equal to [`", stringify!($base), "::MAX`].")]
             pub const MAX: Self = unsafe { $ty::new_unchecked(<$base>::MAX) };
+            #[doc = concat!("Creates a `", stringify!($ty), "` if the given value is positive.")]
             pub const fn new(value: $base) -> Option<Self> {
                 if value < 0 {
                     return None;
                 }
                 unsafe { Some(core::mem::transmute::<$base, Self>(value)) }
             }
+            #[doc = concat!("Creates a `", stringify!($ty), "` without checking whether the value is positive.")]
+            /// This results in undefined behaviour if the value is negative.
+            ///
+            /// # Safety
+            ///
+            /// The value must not be negative.
             #[inline]
             pub const unsafe fn new_unchecked(value: $base) -> Self {
                 debug_assert!(value >= 0);
                 core::mem::transmute::<$base, Self>(value)
             }
+            /// Returns the contained value as a primitive type.
             #[inline]
             pub const fn get(self) -> $base {
                 unsafe {
@@ -65,38 +83,57 @@ macro_rules! impl_positive {
                     n
                 }
             }
+            /// Returns the number of zeros in the binary representation of `self`.
             #[inline]
             pub const fn count_zeros(self) -> u32 {
                 self.get().count_zeros()
             }
+            /// Returns the number of ones in the binary representation of `self`.
             #[inline]
             pub const fn count_ones(self) -> u32 {
                 self.get().count_ones()
             }
+            /// Returns the number of leading zeros in the binary representation of `self`.
             #[inline]
             pub const fn leading_zeros(self) -> u32 {
                 self.get().leading_zeros()
             }
+            /// Returns the number of trailing zeros in the binary representation of `self`.
             #[inline]
             pub const fn trailing_zeros(self) -> u32 {
                 self.get().trailing_zeros()
             }
+            /// Returns `true` if and only if `self == (1 << k)` for some `k`.
             #[inline]
             pub const fn is_power_of_two(self) -> bool {
                 (self.get() as $uns).is_power_of_two()
             }
+            /// Returns the base 2 logarithm of the number, rounded down.
+            ///
+            /// # Panics
+            ///
+            /// This function will panic if `self` is zero.
             #[inline]
             pub const fn ilog2(self) -> u32 {
                 self.get().ilog2()
             }
+            /// Returns the base 10 logarithm of the number, rounded down.
+            ///
+            /// # Panics
+            ///
+            /// This function will panic if `self` is zero.
             #[inline]
             pub const fn ilog10(self) -> u32 {
                 self.get().ilog10()
             }
+            /// Checked negation. Computes `-self`, returning `None` if `self == 0`.
             #[inline]
             pub const fn checked_neg(self) -> Option<$sty> {
                 $sty::new(-self.get())
             }
+            /// Checked addition. Adds a positive integer to another positive integer.
+            /// Checks for overflow and returns [`None`] on overflow.
+            /// As a consequence, the result cannot wrap to a negative integer.
             #[inline]
             pub const fn checked_add(self, rhs: Self) -> Option<Self> {
                 match self.get().checked_add(rhs.get()) {
@@ -104,10 +141,15 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Checked subtraction. Subtracts a positive integer from another positive integer.
+            /// Returns [`None`] if the result would overflow into a negative integer.
             #[inline]
             pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
                 Self::new(self.get() - rhs.get())
             }
+            /// Checked multiplication.
+            /// Multiplies a positive integer by another positive integer, returning a positive result.
+            /// Returns [`None`] if the result would overflow.
             #[inline]
             pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
                 match self.get().checked_mul(rhs.get()) {
@@ -115,6 +157,9 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Checked division.
+            /// Divides a positive integer by another positive integer, returning the positive quotient.
+            /// Returns [`None`] if `rhs == 0`.
             #[inline]
             pub const fn checked_div(self, rhs: Self) -> Option<Self> {
                 match self.get().checked_div(rhs.get()) {
@@ -122,6 +167,10 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Checked remainder.
+            /// Divides a positive integer by another positive integer, returning the positive
+            /// remainder.
+            /// Returns [`None`] if `rhs == 0`.
             #[inline]
             pub const fn checked_rem(self, rhs: Self) -> Option<Self> {
                 match self.get().checked_rem(rhs.get()) {
@@ -129,6 +178,9 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Checked division by unsigned.
+            /// Divides a positive integer by an unsigned integer, returning the positive quotient.
+            /// Returns [`None`] if `rhs == 0`.
             #[inline]
             pub const fn checked_div_unsigned(self, rhs: $uns) -> Option<Self> {
                 match (self.get() as $uns).checked_div(rhs) {
@@ -136,6 +188,9 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Checked remainder of unsigned.
+            /// Divides a positive integer by an unsigned integer, returning the positive remainder.
+            /// Returns [`None`] if `rhs == 0`.
             #[inline]
             pub const fn checked_rem_unsigned(self, rhs: $uns) -> Option<Self> {
                 match (self.get() as $uns).checked_rem(rhs) {
@@ -143,6 +198,10 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Checked integer exponentiation.
+            /// Raises positive value to an integer power.
+            /// Checks for overflow and returns [`None`] on overflow.
+            /// As a consequence, the result cannot wrap to a negative integer.
             #[inline]
             pub const fn checked_pow(self, rhs: u32) -> Option<Self> {
                 match self.get().checked_pow(rhs) {
@@ -150,23 +209,37 @@ macro_rules! impl_positive {
                     None => None,
                 }
             }
+            /// Returns the smallest power of two greater than or equal to `self`.
+            /// Checks for overflow and returns [`None`]
+            /// if the next power of two is greater than the type’s maximum value.
+            /// As a consequence, the result cannot wrap to a negative integer.
             #[inline]
             pub const fn checked_next_power_of_two(self) -> Option<Self> {
                 Self::new((self.get() as $uns).next_power_of_two() as $base)
             }
+            /// Returns the base 2 logarithm of the number, rounded down.
+            ///
+            /// Returns `None` if the number is zero.
             #[inline]
             pub const fn checked_ilog2(self) -> Option<u32> {
                 self.get().checked_ilog2()
             }
+            /// Returns the base 10 logarithm of the number, rounded down.
+            ///
+            /// Returns `None` if the number is zero.
             #[inline]
             pub const fn checked_ilog10(self) -> Option<u32> {
                 self.get().checked_ilog10()
             }
+            /// Saturating addition. Adds a positive integer to another positive integer.
+            #[doc = concat!("Returns [`", stringify!($ty), "::MAX`] on overflow.")]
             #[inline]
             pub const fn saturating_add(self, rhs: Self) -> Self {
                 let n = self.get().saturating_add(rhs.get());
                 unsafe { Self::new_unchecked(n) }
             }
+            /// Saturating subtraction. Subtracts a positive integer from another positive integer.
+            /// Returns 0 if the result would overflow into a negative integer.
             #[inline]
             pub const fn saturating_sub(self, rhs: Self) -> Self {
                 match Self::new(self.get() - rhs.get()) {
@@ -174,11 +247,17 @@ macro_rules! impl_positive {
                     None => Self::MIN
                 }
             }
+            /// Saturating multiplication.
+            /// Multiplies a positive integer by another positive integer, returning a positive result.
+            #[doc = concat!("Returns [`", stringify!($ty), "::MAX`] on overflow.")]
             #[inline]
             pub const fn saturating_mul(self, rhs: Self) -> Self {
                 let n = self.get().saturating_mul(rhs.get());
                 unsafe { Self::new_unchecked(n) }
             }
+            /// Saturating integer exponentiation.
+            /// Raises positive value to an integer power.
+            #[doc = concat!("Returns [`", stringify!($ty), "::MAX`] on overflow.")]
             #[inline]
             pub const fn saturating_pow(self, rhs: u32) -> Self {
                 let n = self.get().saturating_pow(rhs);
@@ -309,6 +388,10 @@ macro_rules! impl_positive {
 
 macro_rules! impl_negative {
     ($(#[$attr:meta])* $ty:ident, $pty:ident, $base:ty, $uns:ty) => {
+        /// A signed value that is known to be negative.
+        ///
+        /// This enables some memory layout optimization.
+        #[doc = concat!("For example, `Option<", stringify!($ty), ">` is the same size as [`", stringify!($base), "`].")]
         #[derive(Copy, Clone)]
         $(#[$attr])*
         #[repr(C)]
@@ -321,20 +404,33 @@ macro_rules! impl_negative {
         }
 
         impl $ty {
+            /// The size of this negative integer type in bits.
+            ///
+            #[doc = concat!("This value is equal to [`", stringify!($base), "::BITS`].")]
             pub const BITS: u32 = <$base>::BITS;
+            #[doc = concat!("The smallest value that can be represented by this negative integer type, equal to [`", stringify!($base), "::MIN`].")]
             pub const MIN: Self = unsafe { $ty::new_unchecked(<$base>::MIN) };
+            /// The largest value that can be represented by this negative integer type, -1.
             pub const MAX: Self = unsafe { $ty::new_unchecked(-1) };
+            #[doc = concat!("Creates a `", stringify!($ty), "` if the given value is negative.")]
             pub const fn new(value: $base) -> Option<Self> {
                 if value >= 0 {
                     return None;
                 }
                 unsafe { Some(core::mem::transmute::<$base, Self>(value)) }
             }
+            #[doc = concat!("Creates a `", stringify!($ty), "` without checking whether the value is negative.")]
+            /// This results in undefined behaviour if the value is positive.
+            ///
+            /// # Safety
+            ///
+            /// The value must not be positive.
             #[inline]
             pub const unsafe fn new_unchecked(value: $base) -> Self {
                 debug_assert!(value < 0);
                 core::mem::transmute::<$base, Self>(value)
             }
+            /// Returns the contained value as a primitive type.
             #[inline]
             pub const fn get(self) -> $base {
                 unsafe {
@@ -343,22 +439,33 @@ macro_rules! impl_negative {
                     n
                 }
             }
+            /// Returns the number of zeros in the binary representation of `self`.
             #[inline]
             pub const fn count_zeros(self) -> u32 {
                 self.get().count_zeros()
             }
+            /// Returns the number of ones in the binary representation of `self`.
             #[inline]
             pub const fn count_ones(self) -> u32 {
                 self.get().count_ones()
             }
+            /// Returns the number of leading zeros in the binary representation of `self`.
+            ///
+            /// Since the value is guaranteed to be negative, this function always returns 0.
             #[inline]
             pub const fn leading_zeros(self) -> u32 {
                 0
             }
+            /// Returns the number of trailing zeros in the binary representation of `self`.
+            ///
+            /// On many architectures, this function can perform better than `trailing_zeros()` on
+            /// the underlying integer type, as special handling of zero can be avoided.
             #[inline]
             pub const fn trailing_zeros(self) -> u32 {
                 self.get().trailing_zeros()
             }
+            /// Checked absolute value.
+            /// Computes `-self`, returning [`None`] if <code>self == [MIN][Self::MIN]</code>.
             #[inline]
             pub const fn checked_abs(self) -> Option<$pty> {
                 match self.get().checked_abs() {
@@ -366,6 +473,8 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked negation.
+            /// Computes `-self`, returning [`None`] if <code>self == [MIN][Self::MIN]</code>.
             #[inline]
             pub const fn checked_neg(self) -> Option<$pty> {
                 match self.get().checked_neg() {
@@ -373,6 +482,9 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked addition. Adds a negative integer to another negative integer.
+            /// Checks for overflow and returns [`None`] on overflow.
+            /// As a consequence, the result cannot wrap to positive integers.
             #[inline]
             pub const fn checked_add(self, rhs: Self) -> Option<Self> {
                 match self.get().checked_add(rhs.get()) {
@@ -380,10 +492,15 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked subtraction. Subtracts a negative integer from another negative integer.
+            /// Returns [`None`] if the result would overflow into a positive integer.
             #[inline]
             pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
                 Self::new(self.get() - rhs.get())
             }
+            /// Checked multiplication.
+            /// Multiplies a negative integer by another negative integer, returning a positive result.
+            /// Returns [`None`] if the result would overflow.
             #[inline]
             pub const fn checked_mul(self, rhs: Self) -> Option<$pty> {
                 match self.get().checked_mul(rhs.get()) {
@@ -391,6 +508,9 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked sign-preserving multiplication. Multiplies a negative integer by a positive
+            /// integer, returning a negative result.
+            /// Returns [`None`] if `rhs == 0` or the result would overflow.
             #[inline]
             pub const fn checked_mul_positive(self, rhs: $pty) -> Option<Self> {
                 match self.get().checked_mul(rhs.get()) {
@@ -398,6 +518,14 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked division.
+            /// Divides a negative integer by another negative integer, returning the positive quotient.
+            /// Returns [`None`] if the result would overflow.
+            ///
+            /// The only case where such an overflow can occur is when one divides
+            /// <code>[MIN][Self::MIN] / -1</code>; this is equivalent to
+            /// <code>-[MIN][Self::MIN]</code>, a positive value that is too large to represent
+            #[doc = concat!("as a [`", stringify!($pty), "`].")]
             #[inline]
             pub const fn checked_div(self, rhs: Self) -> Option<$pty> {
                 match self.get().checked_div(rhs.get()) {
@@ -405,6 +533,15 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked Euclidean division.
+            #[doc = concat!("Calculates the [Euclidean quotient](", stringify!($base), "::div_euclid)")]
+            /// of two negative integers, returning the positive result.
+            /// Returns [`None`] if the result would overflow.
+            ///
+            /// The only case where such an overflow can occur is when one divides
+            /// <code>[MIN][Self::MIN] / -1</code>; this is equivalent to
+            /// <code>-[MIN][Self::MIN]</code>, a positive value that is too large to represent
+            #[doc = concat!("as a [`", stringify!($pty), "`].")]
             #[inline]
             pub const fn checked_div_euclid(self, rhs: Self) -> Option<$pty> {
                 match self.get().checked_div_euclid(rhs.get()) {
@@ -412,26 +549,47 @@ macro_rules! impl_negative {
                     None => None,
                 }
             }
+            /// Checked Euclidean remainder.
+            #[doc = concat!("Calculates the [Euclidean remainder](", stringify!($base), "::rem_euclid)")]
+            /// of a negative integer and any signed integer, returning the positive result.
+            /// Returns [`None`] if `rhs == 0` or the result would overflow.
+            ///
+            /// The only case where such an overflow can occur is when one divides
+            /// <code>[MIN][Self::MIN] / -1</code>; this is equivalent to
+            /// <code>-[MIN][Self::MIN]</code>, a positive value that is too large to represent
+            #[doc = concat!("as a [`", stringify!($pty), "`].")]
             #[inline]
             pub const fn checked_rem_euclid(self, rhs: $base) -> Option<$pty> {
                 let n = self.get().rem_euclid(rhs);
                 unsafe { Some($pty::new_unchecked(n)) }
             }
+            /// Saturating absolute value.
+            /// Computes `-self`, returning
+            #[doc = concat!("[`", stringify!($pty), "::MAX`]")]
+            /// if <code>self == [MIN][Self::MIN]</code>.
             #[inline]
             pub const fn saturating_abs(self) -> $pty {
                 let n = self.get().saturating_abs();
                 unsafe { $pty::new_unchecked(n) }
             }
+            /// Saturating negation.
+            /// Computes `-self`, returning
+            #[doc = concat!("[`", stringify!($pty), "::MAX`]")]
+            /// if <code>self == [MIN][Self::MIN]</code>.
             #[inline]
             pub const fn saturating_neg(self) -> $pty {
                 let n = self.get().saturating_neg();
                 unsafe { $pty::new_unchecked(n) }
             }
+            /// Saturating addition. Adds a negative integer to another negative integer.
+            #[doc = concat!("Returns [`", stringify!($ty), "::MIN`] on overflow.")]
             #[inline]
             pub const fn saturating_add(self, rhs: Self) -> Self {
                 let n = self.get().saturating_add(rhs.get());
                 unsafe { Self::new_unchecked(n) }
             }
+            /// Saturating subtraction. Subtracts a negative integer from another negative integer.
+            /// Returns -1 if the result would overflow into a positive integer.
             #[inline]
             pub const fn saturating_sub(self, rhs: Self) -> Self {
                 match Self::new(self.get() - rhs.get()) {
@@ -439,11 +597,18 @@ macro_rules! impl_negative {
                     None => Self::MAX
                 }
             }
+            /// Saturating multiplication.
+            /// Multiplies a negative integer by another negative integer, returning a positive result.
+            #[doc = concat!("Returns [`", stringify!($pty), "::MAX`] on overflow.")]
             #[inline]
             pub const fn saturating_mul(self, rhs: Self) -> $pty {
                 let n = self.get().saturating_mul(rhs.get());
                 unsafe { $pty::new_unchecked(n) }
             }
+            /// Saturating sign-preserving multiplication.
+            /// Multiplies a negative integer by a positive integer, returning a negative result.
+            /// Returns -1 if `rhs == 0`.
+            #[doc = concat!("Returns [`", stringify!($ty), "::MIN`] on overflow.")]
             #[inline]
             pub const fn saturating_mul_positive(self, rhs: $pty) -> Self {
                 match Self::new(self.get().saturating_mul(rhs.get())) {
