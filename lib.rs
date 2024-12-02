@@ -560,8 +560,10 @@ macro_rules! impl_negative {
             #[doc = concat!("as a [`", stringify!($pty), "`].")]
             #[inline]
             pub const fn checked_rem_euclid(self, rhs: $base) -> Option<$pty> {
-                let n = self.get().rem_euclid(rhs);
-                unsafe { Some($pty::new_unchecked(n)) }
+                match self.get().checked_rem_euclid(rhs) {
+                    Some(n) => unsafe { Some($pty::new_unchecked(n)) },
+                    None => None,
+                }
             }
             /// Saturating absolute value.
             /// Computes `-self`, returning
