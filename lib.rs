@@ -623,6 +623,27 @@ macro_rules! impl_from {
     };
 }
 
+macro_rules! impl_from_get {
+    ($ty:ty =>) => {};
+    ($ty:ty => $from:ty $(, $rest:ty)*) => {
+        impl From<$ty> for $from {
+            #[inline]
+            fn from(value: $ty) -> Self {
+                unsafe { Self::new_unchecked(value.get() as _) }
+            }
+        }
+        impl TryFrom<$from> for $ty {
+            type Error = core::num::TryFromIntError;
+            #[inline]
+            fn try_from(value: $from) -> Result<Self, Self::Error> {
+                let value = <_>::try_from(value.get())?;
+                unsafe { Ok(Self::new_unchecked(value)) }
+            }
+        }
+        impl_from_get! { $ty => $($rest),*}
+    };
+}
+
 macro_rules! impl_primitive_from {
     ($ty:ty =>) => {};
     ($ty:ty => $from:ty $(, $rest:ty)*) => {
@@ -633,6 +654,21 @@ macro_rules! impl_primitive_from {
             }
         }
         impl_primitive_from! { $ty => $($rest),* }
+    };
+}
+
+macro_rules! impl_try_from {
+    ($ty:ty =>) => {};
+    ($ty:ty => $from:ty $(, $rest:ty)*) => {
+        impl TryFrom<$from> for $ty {
+            type Error = core::num::TryFromIntError;
+            #[inline]
+            fn try_from(value: $from) -> Result<Self, Self::Error> {
+                let value = <_>::try_from(value.get())?;
+                unsafe { Ok(Self::new_unchecked(value)) }
+            }
+        }
+        impl_try_from! { $ty => $($rest),*}
     };
 }
 
@@ -699,34 +735,40 @@ macro_rules! impl_bit_op {
 }
 
 impl_positive! { #[repr(align(1))] PositiveI8, NegativeI8, i8, u8 }
+impl_from_get! { PositiveI8 => PositiveI16, PositiveI32, PositiveI64, PositiveIsize }
 impl_primitive_from! { PositiveI8 => u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize }
 impl_positive_try_from! { u8, u16, u32, u64, u128, usize => PositiveI8, i8 }
 impl_positive_try_from! { i16, i32, i64, i128, isize => PositiveI8, u8, i8 }
 impl_positive_try_from! { i8 => PositiveI8, u8 }
 impl_negative! { #[repr(align(1))] NegativeI8, PositiveI8, i8, u8 }
+impl_from_get! { NegativeI8 => NegativeI16, NegativeI32, NegativeI64, NegativeIsize }
 impl_primitive_from! { NegativeI8 => i8, i16, i32, i64, i128, isize }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI8, u8, i8 }
 
 impl_positive! { #[repr(align(2))] PositiveI16, NegativeI16, i16, u16 }
 impl_from! { u8 => PositiveI16 }
+impl_from_get! { PositiveI16 => PositiveI32, PositiveI64, PositiveIsize }
 impl_primitive_from! { PositiveI16 => u16, u32, u64, u128, usize, i16, i32, i64, i128, isize }
 impl_primitive_try_from! { PositiveI16 => u8, i8 }
 impl_positive_try_from! { u16, u32, u64, u128, usize => PositiveI16, i16 }
 impl_positive_try_from! { i8, i32, i64, i128, isize => PositiveI16, u16, i16 }
 impl_positive_try_from! { i16 => PositiveI16, u16 }
 impl_negative! { #[repr(align(2))] NegativeI16, PositiveI16, i16, u16 }
+impl_from_get! { NegativeI16 => NegativeI32, NegativeI64, NegativeIsize }
 impl_primitive_from! { NegativeI16 => i16, i32, i64, i128, isize }
 impl_primitive_try_from! { NegativeI16 => i8 }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI16, u16, i16 }
 
 impl_positive! { #[repr(align(4))] PositiveI32, NegativeI32, i32, u32 }
 impl_from! { u8, u16 => PositiveI32 }
+impl_from_get! { PositiveI32 => PositiveI64 }
 impl_primitive_from! { PositiveI32 => u32, u64, u128, i32, i64, i128 }
 impl_primitive_try_from! { PositiveI32 => u8, u16, usize, i8, i16, isize }
 impl_positive_try_from! { u32, u64, u128, usize => PositiveI32, i32 }
 impl_positive_try_from! { i8, i16, i64, i128, isize => PositiveI32, u32, i32 }
 impl_positive_try_from! { i32 => PositiveI32, u32 }
 impl_negative! { #[repr(align(4))] NegativeI32, PositiveI32, i32, u32 }
+impl_from_get! { NegativeI32 => NegativeI64 }
 impl_primitive_from! { NegativeI32 => i32, i64, i128 }
 impl_primitive_try_from! { NegativeI32 => i8, i16, isize }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI32, u32, i32 }
@@ -757,6 +799,7 @@ impl_positive! {
     PositiveIsize, NegativeIsize, isize, usize
 }
 impl_from! { u8 => PositiveIsize }
+impl_try_from! { PositiveIsize => PositiveI32, PositiveI64 }
 impl_primitive_from! { PositiveIsize => usize, isize }
 impl_primitive_try_from! { PositiveIsize => u8, u16, u32, u64, u128, i8, i16, i32, i64, i128 }
 impl_positive_try_from! { u16, u32, u64, u128, usize => PositiveIsize, isize }
@@ -768,6 +811,7 @@ impl_negative! {
     #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
     NegativeIsize, PositiveIsize, isize, usize
 }
+impl_try_from! { NegativeIsize => NegativeI32, NegativeI64 }
 impl_primitive_from! { NegativeIsize => isize }
 impl_primitive_try_from! { NegativeIsize => i8, i16, i32, i64, i128 }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeIsize, usize, isize }
