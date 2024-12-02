@@ -98,54 +98,54 @@ macro_rules! impl_positive {
                 $sty::new(-self.get())
             }
             #[inline]
-            pub const fn checked_add(self, other: Self) -> Option<Self> {
-                match self.get().checked_add(other.get()) {
+            pub const fn checked_add(self, rhs: Self) -> Option<Self> {
+                match self.get().checked_add(rhs.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_sub(self, other: Self) -> Option<Self> {
-                Self::new(self.get() - other.get())
+            pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
+                Self::new(self.get() - rhs.get())
             }
             #[inline]
-            pub const fn checked_mul(self, other: Self) -> Option<Self> {
-                match self.get().checked_mul(other.get()) {
+            pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
+                match self.get().checked_mul(rhs.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_div(self, other: Self) -> Option<Self> {
-                match self.get().checked_div(other.get()) {
+            pub const fn checked_div(self, rhs: Self) -> Option<Self> {
+                match self.get().checked_div(rhs.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_rem(self, other: Self) -> Option<Self> {
-                match self.get().checked_rem(other.get()) {
+            pub const fn checked_rem(self, rhs: Self) -> Option<Self> {
+                match self.get().checked_rem(rhs.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_div_unsigned(self, other: $uns) -> Option<Self> {
-                match (self.get() as $uns).checked_div(other) {
+            pub const fn checked_div_unsigned(self, rhs: $uns) -> Option<Self> {
+                match (self.get() as $uns).checked_div(rhs) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n as $base)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_rem_unsigned(self, other: $uns) -> Option<Self> {
-                match (self.get() as $uns).checked_rem(other) {
+            pub const fn checked_rem_unsigned(self, rhs: $uns) -> Option<Self> {
+                match (self.get() as $uns).checked_rem(rhs) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n as $base)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_pow(self, other: u32) -> Option<Self> {
-                match self.get().checked_pow(other) {
+            pub const fn checked_pow(self, rhs: u32) -> Option<Self> {
+                match self.get().checked_pow(rhs) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
@@ -163,25 +163,25 @@ macro_rules! impl_positive {
                 self.get().checked_ilog10()
             }
             #[inline]
-            pub const fn saturating_add(self, other: Self) -> Self {
-                let n = self.get().saturating_add(other.get());
+            pub const fn saturating_add(self, rhs: Self) -> Self {
+                let n = self.get().saturating_add(rhs.get());
                 unsafe { Self::new_unchecked(n) }
             }
             #[inline]
-            pub const fn saturating_sub(self, other: Self) -> Self {
-                match Self::new(self.get() - other.get()) {
+            pub const fn saturating_sub(self, rhs: Self) -> Self {
+                match Self::new(self.get() - rhs.get()) {
                     Some(n) => n,
                     None => Self::MIN
                 }
             }
             #[inline]
-            pub const fn saturating_mul(self, other: Self) -> Self {
-                let n = self.get().saturating_mul(other.get());
+            pub const fn saturating_mul(self, rhs: Self) -> Self {
+                let n = self.get().saturating_mul(rhs.get());
                 unsafe { Self::new_unchecked(n) }
             }
             #[inline]
-            pub const fn saturating_pow(self, other: u32) -> Self {
-                let n = self.get().saturating_pow(other);
+            pub const fn saturating_pow(self, rhs: u32) -> Self {
+                let n = self.get().saturating_pow(rhs);
                 unsafe { Self::new_unchecked(n) }
             }
         }
@@ -195,8 +195,8 @@ macro_rules! impl_positive {
 
         impl PartialEq for $ty {
             #[inline]
-            fn eq(&self, other: &Self) -> bool {
-                self.get().eq(&other.get())
+            fn eq(&self, rhs: &Self) -> bool {
+                self.get().eq(&rhs.get())
             }
         }
 
@@ -207,8 +207,8 @@ macro_rules! impl_positive {
         }
 
         impl Ord for $ty {
-            fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-                self.get().cmp(&other.get())
+            fn cmp(&self, rhs: &Self) -> core::cmp::Ordering {
+                self.get().cmp(&rhs.get())
             }
         }
 
@@ -374,26 +374,26 @@ macro_rules! impl_negative {
                 }
             }
             #[inline]
-            pub const fn checked_add(self, other: Self) -> Option<Self> {
-                match self.get().checked_add(other.get()) {
+            pub const fn checked_add(self, rhs: Self) -> Option<Self> {
+                match self.get().checked_add(rhs.get()) {
                     Some(n) => unsafe { Some(Self::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_sub(self, other: Self) -> Option<Self> {
-                Self::new(self.get() - other.get())
+            pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
+                Self::new(self.get() - rhs.get())
             }
             #[inline]
-            pub const fn checked_mul(self, other: Self) -> Option<$pty> {
-                match self.get().checked_mul(other.get()) {
+            pub const fn checked_mul(self, rhs: Self) -> Option<$pty> {
+                match self.get().checked_mul(rhs.get()) {
                     Some(n) => unsafe { Some($pty::new_unchecked(n)) },
                     None => None,
                 }
             }
             #[inline]
-            pub const fn checked_mul_positive(self, other: $pty) -> Option<Self> {
-                match self.get().checked_mul(other.get()) {
+            pub const fn checked_mul_positive(self, rhs: $pty) -> Option<Self> {
+                match self.get().checked_mul(rhs.get()) {
                     Some(n) => Self::new(n),
                     None => None,
                 }
@@ -413,8 +413,8 @@ macro_rules! impl_negative {
                 }
             }
             #[inline]
-            pub const fn checked_rem_euclid(self, other: $base) -> Option<$pty> {
-                let n = self.get().rem_euclid(other);
+            pub const fn checked_rem_euclid(self, rhs: $base) -> Option<$pty> {
+                let n = self.get().rem_euclid(rhs);
                 unsafe { Some($pty::new_unchecked(n)) }
             }
             #[inline]
@@ -428,25 +428,25 @@ macro_rules! impl_negative {
                 unsafe { $pty::new_unchecked(n) }
             }
             #[inline]
-            pub const fn saturating_add(self, other: Self) -> Self {
-                let n = self.get().saturating_add(other.get());
+            pub const fn saturating_add(self, rhs: Self) -> Self {
+                let n = self.get().saturating_add(rhs.get());
                 unsafe { Self::new_unchecked(n) }
             }
             #[inline]
-            pub const fn saturating_sub(self, other: Self) -> Self {
-                match Self::new(self.get() - other.get()) {
+            pub const fn saturating_sub(self, rhs: Self) -> Self {
+                match Self::new(self.get() - rhs.get()) {
                     Some(n) => n,
                     None => Self::MAX
                 }
             }
             #[inline]
-            pub const fn saturating_mul(self, other: Self) -> $pty {
-                let n = self.get().saturating_mul(other.get());
+            pub const fn saturating_mul(self, rhs: Self) -> $pty {
+                let n = self.get().saturating_mul(rhs.get());
                 unsafe { $pty::new_unchecked(n) }
             }
             #[inline]
-            pub const fn saturating_mul_positive(self, other: $pty) -> Self {
-                match Self::new(self.get().saturating_mul(other.get())) {
+            pub const fn saturating_mul_positive(self, rhs: $pty) -> Self {
+                match Self::new(self.get().saturating_mul(rhs.get())) {
                     Some(n) => n,
                     None => Self::MAX,
                 }
@@ -455,8 +455,8 @@ macro_rules! impl_negative {
 
         impl PartialEq for $ty {
             #[inline]
-            fn eq(&self, other: &Self) -> bool {
-                self.get().eq(&other.get())
+            fn eq(&self, rhs: &Self) -> bool {
+                self.get().eq(&rhs.get())
             }
         }
 
@@ -467,8 +467,8 @@ macro_rules! impl_negative {
         }
 
         impl Ord for $ty {
-            fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-                self.get().cmp(&other.get())
+            fn cmp(&self, rhs: &Self) -> core::cmp::Ordering {
+                self.get().cmp(&rhs.get())
             }
         }
 
