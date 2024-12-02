@@ -353,7 +353,7 @@ macro_rules! impl_negative {
             }
             #[inline]
             pub const fn leading_zeros(self) -> u32 {
-                self.get().leading_zeros()
+                0
             }
             #[inline]
             pub const fn trailing_zeros(self) -> u32 {
