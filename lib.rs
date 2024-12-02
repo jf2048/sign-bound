@@ -50,17 +50,17 @@ macro_rules! impl_positive {
                 if value < 0 {
                     return None;
                 }
-                unsafe { Some(core::mem::transmute(value)) }
+                unsafe { Some(core::mem::transmute::<$base, Self>(value)) }
             }
             #[inline]
             pub const unsafe fn new_unchecked(value: $base) -> Self {
                 debug_assert!(value >= 0);
-                core::mem::transmute(value)
+                core::mem::transmute::<$base, Self>(value)
             }
             #[inline]
             pub const fn get(self) -> $base {
                 unsafe {
-                    let n = core::mem::transmute(self);
+                    let n = core::mem::transmute::<Self, $base>(self);
                     core::hint::assert_unchecked(n >= 0);
                     n
                 }
@@ -201,8 +201,8 @@ macro_rules! impl_positive {
         }
 
         impl PartialOrd for $ty {
-            fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-                self.get().partial_cmp(&other.get())
+            fn partial_cmp(&self, rhs: &Self) -> Option<core::cmp::Ordering> {
+                Some(self.cmp(rhs))
             }
         }
 
@@ -328,17 +328,17 @@ macro_rules! impl_negative {
                 if value >= 0 {
                     return None;
                 }
-                unsafe { Some(core::mem::transmute(value)) }
+                unsafe { Some(core::mem::transmute::<$base, Self>(value)) }
             }
             #[inline]
             pub const unsafe fn new_unchecked(value: $base) -> Self {
                 debug_assert!(value < 0);
-                core::mem::transmute(value)
+                core::mem::transmute::<$base, Self>(value)
             }
             #[inline]
             pub const fn get(self) -> $base {
                 unsafe {
-                    let n = core::mem::transmute(self);
+                    let n = core::mem::transmute::<Self, $base>(self);
                     core::hint::assert_unchecked(n < 0);
                     n
                 }
@@ -457,8 +457,8 @@ macro_rules! impl_negative {
         }
 
         impl PartialOrd for $ty {
-            fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-                self.get().partial_cmp(&other.get())
+            fn partial_cmp(&self, rhs: &Self) -> Option<core::cmp::Ordering> {
+                Some(self.cmp(rhs))
             }
         }
 
