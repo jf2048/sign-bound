@@ -399,14 +399,18 @@ macro_rules! impl_negative {
                 }
             }
             #[inline]
-            pub const fn checked_div(self, other: Self) -> Option<$pty> {
-                let n = self.get() / other.get();
-                unsafe { Some($pty::new_unchecked(n)) }
+            pub const fn checked_div(self, rhs: Self) -> Option<$pty> {
+                match self.get().checked_div(rhs.get()) {
+                    Some(n) => unsafe { Some($pty::new_unchecked(n)) },
+                    None => None,
+                }
             }
             #[inline]
-            pub const fn checked_div_euclid(self, other: Self) -> Option<$pty> {
-                let n = self.get().div_euclid(other.get());
-                unsafe { Some($pty::new_unchecked(n)) }
+            pub const fn checked_div_euclid(self, rhs: Self) -> Option<$pty> {
+                match self.get().checked_div_euclid(rhs.get()) {
+                    Some(n) => unsafe { Some($pty::new_unchecked(n)) },
+                    None => None,
+                }
             }
             #[inline]
             pub const fn checked_rem_euclid(self, other: $base) -> Option<$pty> {
