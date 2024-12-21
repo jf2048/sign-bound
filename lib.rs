@@ -31,7 +31,30 @@
 #![no_std]
 
 macro_rules! impl_positive {
-    ($(#[$attr:meta])* $ty:ident, $sty:ident, $base:ty, $uns:ty) => {
+    ($(#[$attr:meta])* $ty:ident, $sty:ident, $d:tt $mac:ident, $base:ty, $uns:ty) => {
+
+        #[doc = concat!("Creates a [`", stringify!($ty), "`] checked at compile time.")]
+        ///
+        #[doc = concat!("This macro takes a single argument that must be a positive [`", stringify!($base), "`].")]
+        /// Negative values will cause a compile error.
+        ///
+        /// ```rust
+        #[doc = concat!("use sign_bound::{", stringify!($ty), ", ", stringify!($mac), "};")]
+        ///
+        #[doc = concat!("let val: ", stringify!($ty), " = ", stringify!($mac), "!(123);")]
+        /// ```
+        #[macro_export]
+        macro_rules! $mac {
+            ($e:expr $d(,)?) => {
+                const {
+                    match $crate::$ty::new($e) {
+                        ::core::option::Option::Some(e) => e,
+                        _ => panic!(concat!(stringify!($base), " out of range for ", stringify!($ty))),
+                    }
+                }
+            };
+        }
+
         /// A signed value that is known to be positive.
         ///
         /// This enables some memory layout optimization.
@@ -387,7 +410,30 @@ macro_rules! impl_positive {
 }
 
 macro_rules! impl_negative {
-    ($(#[$attr:meta])* $ty:ident, $pty:ident, $base:ty, $uns:ty) => {
+    ($(#[$attr:meta])* $ty:ident, $pty:ident, $d:tt $mac:ident, $base:ty, $uns:ty) => {
+
+        #[doc = concat!("Creates a [`", stringify!($ty), "`] checked at compile time.")]
+        ///
+        #[doc = concat!("This macro takes a single argument that must be a negative [`", stringify!($base), "`].")]
+        /// Positive values will cause a compile error.
+        ///
+        /// ```rust
+        #[doc = concat!("use sign_bound::{", stringify!($ty), ", ", stringify!($mac), "};")]
+        ///
+        #[doc = concat!("let val: ", stringify!($ty), " = ", stringify!($mac), "!(-123);")]
+        /// ```
+        #[macro_export]
+        macro_rules! $mac {
+            ($e:expr $d(,)?) => {
+                const {
+                    match $crate::$ty::new($e) {
+                        ::core::option::Option::Some(e) => e,
+                        _ => panic!(concat!(stringify!($base), " out of range for ", stringify!($ty))),
+                    }
+                }
+            };
+        }
+
         /// A signed value that is known to be negative.
         ///
         /// This enables some memory layout optimization.
@@ -905,18 +951,18 @@ macro_rules! impl_bit_op {
     };
 }
 
-impl_positive! { #[repr(align(1))] PositiveI8, NegativeI8, i8, u8 }
+impl_positive! { #[repr(align(1))] PositiveI8, NegativeI8, $ positive_i8, i8, u8 }
 impl_from_get! { PositiveI8 => PositiveI16, PositiveI32, PositiveI64, PositiveIsize }
 impl_primitive_from! { PositiveI8 => u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize }
 impl_positive_try_from! { u8, u16, u32, u64, u128, usize => PositiveI8, i8 }
 impl_positive_try_from! { i16, i32, i64, i128, isize => PositiveI8, u8, i8 }
 impl_positive_try_from! { i8 => PositiveI8, u8 }
-impl_negative! { #[repr(align(1))] NegativeI8, PositiveI8, i8, u8 }
+impl_negative! { #[repr(align(1))] NegativeI8, PositiveI8, $ negative_i8, i8, u8 }
 impl_from_get! { NegativeI8 => NegativeI16, NegativeI32, NegativeI64, NegativeIsize }
 impl_primitive_from! { NegativeI8 => i8, i16, i32, i64, i128, isize }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI8, u8, i8 }
 
-impl_positive! { #[repr(align(2))] PositiveI16, NegativeI16, i16, u16 }
+impl_positive! { #[repr(align(2))] PositiveI16, NegativeI16, $ positive_i16, i16, u16 }
 impl_from! { u8 => PositiveI16 }
 impl_from_get! { PositiveI16 => PositiveI32, PositiveI64, PositiveIsize }
 impl_primitive_from! { PositiveI16 => u16, u32, u64, u128, usize, i16, i32, i64, i128, isize }
@@ -924,13 +970,13 @@ impl_primitive_try_from! { PositiveI16 => u8, i8 }
 impl_positive_try_from! { u16, u32, u64, u128, usize => PositiveI16, i16 }
 impl_positive_try_from! { i8, i32, i64, i128, isize => PositiveI16, u16, i16 }
 impl_positive_try_from! { i16 => PositiveI16, u16 }
-impl_negative! { #[repr(align(2))] NegativeI16, PositiveI16, i16, u16 }
+impl_negative! { #[repr(align(2))] NegativeI16, PositiveI16, $ negative_i16, i16, u16 }
 impl_from_get! { NegativeI16 => NegativeI32, NegativeI64, NegativeIsize }
 impl_primitive_from! { NegativeI16 => i16, i32, i64, i128, isize }
 impl_primitive_try_from! { NegativeI16 => i8 }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI16, u16, i16 }
 
-impl_positive! { #[repr(align(4))] PositiveI32, NegativeI32, i32, u32 }
+impl_positive! { #[repr(align(4))] PositiveI32, NegativeI32, $ positive_i32, i32, u32 }
 impl_from! { u8, u16 => PositiveI32 }
 impl_from_get! { PositiveI32 => PositiveI64 }
 impl_primitive_from! { PositiveI32 => u32, u64, u128, i32, i64, i128 }
@@ -938,20 +984,20 @@ impl_primitive_try_from! { PositiveI32 => u8, u16, usize, i8, i16, isize }
 impl_positive_try_from! { u32, u64, u128, usize => PositiveI32, i32 }
 impl_positive_try_from! { i8, i16, i64, i128, isize => PositiveI32, u32, i32 }
 impl_positive_try_from! { i32 => PositiveI32, u32 }
-impl_negative! { #[repr(align(4))] NegativeI32, PositiveI32, i32, u32 }
+impl_negative! { #[repr(align(4))] NegativeI32, PositiveI32, $ negative_i32, i32, u32 }
 impl_from_get! { NegativeI32 => NegativeI64 }
 impl_primitive_from! { NegativeI32 => i32, i64, i128 }
 impl_primitive_try_from! { NegativeI32 => i8, i16, isize }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI32, u32, i32 }
 
-impl_positive! { #[repr(align(8))] PositiveI64, NegativeI64, i64, u64 }
+impl_positive! { #[repr(align(8))] PositiveI64, NegativeI64, $ positive_i64, i64, u64 }
 impl_from! { u8, u16, u32 => PositiveI64 }
 impl_primitive_from! { PositiveI64 => u64, u128, i64, i128 }
 impl_primitive_try_from! { PositiveI64 => u8, u16, u32, usize, i8, i16, i32, isize }
 impl_positive_try_from! { u64, u128, usize => PositiveI64, i64 }
 impl_positive_try_from! { i8, i16, i32, i128, isize => PositiveI64, u64, i64 }
 impl_positive_try_from! { i64 => PositiveI64, u64 }
-impl_negative! { #[repr(align(8))] NegativeI64, PositiveI64, i64, u64 }
+impl_negative! { #[repr(align(8))] NegativeI64, PositiveI64, $ negative_i64, i64, u64 }
 impl_primitive_from! { NegativeI64 => i64, i128 }
 impl_primitive_try_from! { NegativeI64 => i8, i16, i32, isize }
 impl_negative_try_from! { i8, i16, i32, i64, i128, isize => NegativeI64, u64, i64 }
@@ -967,7 +1013,7 @@ impl_positive! {
     #[cfg_attr(target_pointer_width = "16", repr(align(2)))]
     #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
     #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
-    PositiveIsize, NegativeIsize, isize, usize
+    PositiveIsize, NegativeIsize, $ positive_isize, isize, usize
 }
 impl_from! { u8 => PositiveIsize }
 impl_try_from! { PositiveIsize => PositiveI32, PositiveI64 }
@@ -980,7 +1026,7 @@ impl_negative! {
     #[cfg_attr(target_pointer_width = "16", repr(align(2)))]
     #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
     #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
-    NegativeIsize, PositiveIsize, isize, usize
+    NegativeIsize, PositiveIsize, $ negative_isize, isize, usize
 }
 impl_try_from! { NegativeIsize => NegativeI32, NegativeI64 }
 impl_primitive_from! { NegativeIsize => isize }
