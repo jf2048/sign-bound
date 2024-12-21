@@ -1,6 +1,6 @@
 [package]
 name = "sign-bound"
-version = "2.1.1"
+version = "2.2.0"
 rust-version = "1.81.0"
 edition = "2021"
 description = "Layout-optimized positive and negative integers"
